@@ -1,0 +1,20 @@
+{
+  "urgente": {
+    "type": "noul",
+    "instructions": "El mensaje transmite urgencia o sensibilidad al tiempo"
+  },
+  "pide_reembolso": {
+    "type": "noul",
+    "instructions": "El cliente pide que le devuelvan dinero"
+  },
+  "categoria": {
+    "type": "choice",
+    "instructions": "¿De qué área es el problema principal?",
+    "options": ["facturación", "problema técnico", "cuenta y acceso", "pregunta general", "otro"]
+  },
+  "frustracion": {
+    "type": "score",
+    "instructions": "Nivel de frustración del cliente",
+    "levels": ["ninguna", "baja", "media", "alta", "extrema"]
+  }
+}
