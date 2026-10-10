@@ -4,9 +4,11 @@ A teacher is anything with ``complete(prompt, max_tokens) -> str``. Two adapters
 cover practically every provider:
 
 - ``anthropic``: the Claude Messages API.
-- ``openai``: any OpenAI compatible Chat Completions endpoint (OpenAI, Gemini,
-  Groq, OpenRouter, DeepSeek, Mistral, Together, Ollama, vLLM, LM Studio...),
+- ``openai``: any OpenAI compatible Chat Completions endpoint (OpenAI, Groq,
+  OpenRouter, DeepSeek, Mistral, Together, Ollama, vLLM, LM Studio...),
   selected with ``base_url``.
+- ``gemini``: Google Gemini through its OpenAI compatible endpoint, preset with
+  Google's URL and the ``GEMINI_API_KEY`` variable.
 
 Adapters raise ``TransientError`` for failures worth retrying; ``ask`` owns the
 retry loop so every backend behaves the same.
@@ -27,7 +29,9 @@ try:
 except ModuleNotFoundError:
     openai = None
 
-PROVIDERS = ("anthropic", "openai")
+PROVIDERS = ("anthropic", "openai", "gemini")
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+GEMINI_KEY_ENV = "GEMINI_API_KEY"
 
 
 class TransientError(Exception):
@@ -128,11 +132,16 @@ def build_teacher(provider: str, model: str, *, base_url: str | None = None,
             raise SystemExit("the anthropic package is not installed: pip install anthropic")
         client = anthropic.Anthropic(api_key=api_key, base_url=base_url, max_retries=max_retries)
         return AnthropicTeacher(client, model, effort)
-    if provider == "openai":
+    if provider in ("openai", "gemini"):
         if openai is None:
             raise SystemExit("the openai package is not installed: pip install 'falco[openai]'")
+        if provider == "gemini":
+            base_url = base_url or GEMINI_BASE_URL
+            api_key = api_key or os.environ.get(GEMINI_KEY_ENV)
+            if not api_key:
+                raise SystemExit(f"set {GEMINI_KEY_ENV} or pass --api-key-env for Gemini")
         # Local servers (Ollama, vLLM, LM Studio) accept any key but the SDK demands one.
-        if api_key is None and base_url and not os.environ.get("OPENAI_API_KEY"):
+        elif api_key is None and base_url and not os.environ.get("OPENAI_API_KEY"):
             api_key = "not-needed"
         client = openai.OpenAI(api_key=api_key, base_url=base_url, max_retries=max_retries)
         # Official OpenAI reasoning models reject max_tokens; most compatible servers
