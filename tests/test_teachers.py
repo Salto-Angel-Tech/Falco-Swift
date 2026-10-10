@@ -185,3 +185,33 @@ def test_build_teacher_anthropic():
 
     assert isinstance(teacher, AnthropicTeacher)
     assert teacher.effort == "low"
+
+
+# ---------- gemini ----------
+
+def test_build_teacher_gemini_uses_google_endpoint_and_gemini_key(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+
+    teacher = build_teacher("gemini", "gemini-3.8-flash", effort="low")
+
+    assert isinstance(teacher, OpenAICompatibleTeacher)
+    assert str(teacher.client.base_url) == teachers.GEMINI_BASE_URL
+    assert teacher.client.api_key == "gemini-test-key"
+    assert teacher.max_tokens_param == "max_tokens"
+    assert teacher.effort == "low"
+
+
+def test_build_teacher_gemini_explicit_key_and_base_url_win(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "from-env")
+
+    teacher = build_teacher("gemini", "m", api_key="explicit", base_url="https://proxy.test/v1/")
+
+    assert teacher.client.api_key == "explicit"
+    assert str(teacher.client.base_url) == "https://proxy.test/v1/"
+
+
+def test_build_teacher_gemini_requires_a_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    with pytest.raises(SystemExit, match="GEMINI_API_KEY"):
+        build_teacher("gemini", "m")
