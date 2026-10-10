@@ -4,9 +4,9 @@ Each output row is one (state, question) pair with a target probability
 distribution over the question options, ready for train.py.
 
 The teacher can be any model: Claude through the Anthropic API, Gemini through
-Google's API (key in GEMINI_API_KEY), or anything that speaks the OpenAI Chat
-Completions protocol (OpenAI, Groq, OpenRouter, DeepSeek, Ollama, vLLM, LM
-Studio...). Flags fall back to FALCO_PROVIDER,
+Google's API (key in GEMINI_API_KEY), OpenRouter (key in OPENROUTER_API_KEY),
+or anything that speaks the OpenAI Chat Completions protocol (OpenAI, Groq,
+DeepSeek, Ollama, vLLM, LM Studio...). Flags fall back to FALCO_PROVIDER,
 FALCO_MODEL, FALCO_BASE_URL and FALCO_API_KEY_ENV.
 
 Examples:
@@ -16,6 +16,8 @@ Examples:
     python tag.py --questions questions.json --generate 200 --provider openai \\
         --base-url http://localhost:11434/v1 --model llama3.1
     python tag.py --questions questions.json --generate 200 --provider gemini
+    python tag.py --questions questions.json --generate 200 --provider openrouter \\
+        --model deepseek/deepseek-chat
 """
 
 import argparse
@@ -29,7 +31,12 @@ from pathlib import Path
 from schema import normalize_state, options_of, validate_question
 from teachers import PROVIDERS, Teacher, ask, build_teacher
 
-DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-5", "gemini": "gemini-3.8-flash"}
+DEFAULT_MODELS = {
+    "anthropic": "claude-sonnet-5",
+    "openai": "gpt-5",
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "deepseek/deepseek-chat",
+}
 
 EPS = 1e-3
 TRUE_ALIASES = ("true", "yes", "si", "sí", "1")
@@ -225,7 +232,8 @@ def main():
     ap.add_argument("--output", default="data.jsonl")
     ap.add_argument("--provider", choices=PROVIDERS,
                     default=os.environ.get("FALCO_PROVIDER", "anthropic"),
-                    help="teacher API: anthropic, gemini, or openai for any OpenAI compatible endpoint")
+                    help="teacher API: anthropic, gemini, openrouter, or openai for any OpenAI "
+                         "compatible endpoint")
     ap.add_argument("--model", default=os.environ.get("FALCO_MODEL"),
                     help=f"teacher model (default per provider: {DEFAULT_MODELS})")
     ap.add_argument("--base-url", default=os.environ.get("FALCO_BASE_URL"),
@@ -233,7 +241,7 @@ def main():
     ap.add_argument("--api-key-env", default=os.environ.get("FALCO_API_KEY_ENV"),
                     help="env variable holding the API key (default: the SDK's own)")
     ap.add_argument("--effort", choices=["none", "minimal", "low", "medium", "high", "xhigh", "max"],
-                    help="reasoning effort; anthropic defaults to low, openai and gemini send none")
+                    help="reasoning effort; anthropic defaults to low, other providers send none")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--max-retries", type=int, default=3, help="SDK level retries per request")
     args = ap.parse_args()
