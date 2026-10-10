@@ -19,7 +19,7 @@ def choice_device() -> str :
 class SystemOne(nn.Module):
     def __init__(self, model_base: str | None = None , encoder = None ):
         super().__init__()
-        self.encoder = encoder if encoder is not None else AutoModel.from_pretrained(model_base)
+        self.encoder = encoder if encoder is not None else AutoModel.from_pretrained(model_base, dtype=torch.float32)
         hidden = self.encoder.config.hidden_size
         self.head = nn.Sequential(nn.Dropout(0.1), nn.Linear(hidden, 1))
         self.register_buffer("temperature", torch.ones(1))
@@ -45,7 +45,7 @@ class SystemOne(nn.Module):
     @classmethod
     def load(cls , folder):
         route = Path(folder)
-        model = cls(encoder=AutoModel.from_pretrained(route / "encoder"))
+        model = cls(encoder=AutoModel.from_pretrained(route / "encoder", dtype=torch.float32))
         ckpt = torch.load(route / "head.pt" , map_location="cpu")
         model.head.load_state_dict(ckpt["head"])
         model.temperature.copy_(ckpt["temperature"])
