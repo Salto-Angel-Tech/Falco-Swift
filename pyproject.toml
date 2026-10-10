@@ -9,3 +9,17 @@ dependencies = [
     "transformers>=5.17.0",
     "uvicorn>=0.54.0",
 ]
+
+[project.optional-dependencies]
+openai = [
+    "openai>=3.28.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
