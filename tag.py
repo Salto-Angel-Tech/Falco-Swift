@@ -3,25 +3,34 @@
 Each output row is one (state, question) pair with a target probability
 distribution over the question options, ready for train.py.
 
+The teacher can be any model: Claude through the Anthropic API, or anything that
+speaks the OpenAI Chat Completions protocol (OpenAI, Gemini, Groq, OpenRouter,
+DeepSeek, Ollama, vLLM, LM Studio...). Flags fall back to FALCO_PROVIDER,
+FALCO_MODEL, FALCO_BASE_URL and FALCO_API_KEY_ENV.
+
 Examples:
     python tag.py --questions questions.json --generate 200
     python tag.py --questions questions.json --states states.txt --output data.jsonl
+    python tag.py --questions questions.json --generate 200 --provider openai --model gpt-5
+    python tag.py --questions questions.json --generate 200 --provider openai \\
+        --base-url http://localhost:11434/v1 --model llama3.1
+    python tag.py --questions questions.json --generate 200 --provider openai \\
+        --base-url https://generativelanguage.googleapis.com/v1beta/openai/ \\
+        --model gemini-2.5-flash --api-key-env GEMINI_API_KEY
 """
 
 import argparse
 import json
+import os
 import random
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from schema import normalize_state, options_of, validate_question
+from teachers import PROVIDERS, Teacher, ask, build_teacher
 
-try:
-    import anthropic
-except ModuleNotFoundError:  # the parsing helpers stay importable without the SDK
-    anthropic = None
+DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-5"}
 
 EPS = 1e-3
 TRUE_ALIASES = ("true", "yes", "si", "sí", "1")
@@ -105,40 +114,8 @@ def diversity_hint() -> str:
 
 # ---------- LLM calls ----------
 
-def call_teacher(client, model: str, prompt: str, max_tokens: int, effort: str,
-                 attempts: int = 4) -> str:
-    """One teacher call. Retries transient failures only; client errors surface immediately."""
-    for attempt in range(attempts):
-        try:
-            response = client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                output_config={"effort": effort},
-                messages=[{"role": "user", "content": prompt}],
-            )
-        except (anthropic.RateLimitError, anthropic.APIConnectionError,
-                anthropic.APITimeoutError) as error:
-            transient = error
-        except anthropic.APIStatusError as error:
-            if error.status_code < 500:
-                raise  # bad request, auth, missing model: retrying will not help
-            transient = error
-        else:
-            if response.stop_reason == "refusal":
-                raise RuntimeError(f"teacher declined the request: {response.stop_details}")
-            if response.stop_reason == "max_tokens":
-                raise RuntimeError(f"reply truncated at max_tokens={max_tokens}")
-            return "".join(b.text for b in response.content if b.type == "text")
-
-        if attempt == attempts - 1:
-            raise RuntimeError(f"the teacher failed {attempts} times") from transient
-        delay = 2 ** attempt + random.random()
-        print(f"  warning: {type(transient).__name__}, retrying in {delay:.0f}s")
-        time.sleep(delay)
-
-
-def generate_states(client, model: str, questions: dict, domain: str, n: int,
-                    effort: str, batch_size: int = 25, max_failures: int = 5) -> list[str]:
+def generate_states(teacher: Teacher, questions: dict, domain: str, n: int,
+                    batch_size: int = 25, max_failures: int = 5) -> list[str]:
     """Generate synthetic states. Returns fewer than n if generation keeps failing."""
     states: list[str] = []
     seen: set[str] = set()
@@ -154,7 +131,7 @@ def generate_states(client, model: str, questions: dict, domain: str, n: int,
             "Reply ONLY with a JSON array of strings, nothing else."
         )
         try:
-            batch = extract_json(call_teacher(client, model, prompt, GENERATE_MAX_TOKENS, effort))
+            batch = extract_json(ask(teacher, prompt, GENERATE_MAX_TOKENS))
             fresh = [s.strip() for s in batch if isinstance(s, str) and s.strip()]
         except Exception as error:
             failures += 1
@@ -171,7 +148,7 @@ def generate_states(client, model: str, questions: dict, domain: str, n: int,
     return states[:n]
 
 
-def label_state(client, model: str, questions: dict, state: str, effort: str) -> list[dict]:
+def label_state(teacher: Teacher, questions: dict, state: str) -> list[dict]:
     """Ask the teacher for every question about one state and build its training rows."""
     prompt = (
         "You are an expert, WELL CALIBRATED annotator. Read the STATE and answer each question "
@@ -181,7 +158,7 @@ def label_state(client, model: str, questions: dict, state: str, effort: str) ->
         f"QUESTIONS:\n{describe_questions(questions)}\n\n"
         "Reply ONLY with a JSON object whose keys are the question names."
     )
-    answer = extract_json(call_teacher(client, model, prompt, LABEL_MAX_TOKENS, effort))
+    answer = extract_json(ask(teacher, prompt, LABEL_MAX_TOKENS))
     if not isinstance(answer, dict):
         raise ValueError(f"expected a JSON object, got {type(answer).__name__}")
     rows = []
@@ -247,15 +224,30 @@ def main():
     ap.add_argument("--generate", type=int, default=0, help="number of synthetic states to generate")
     ap.add_argument("--domain", default="customer messages sent to a support team")
     ap.add_argument("--output", default="data.jsonl")
-    ap.add_argument("--model", default="claude-sonnet-5", help="teacher model")
-    ap.add_argument("--effort", default="low", choices=["low", "medium", "high", "xhigh", "max"])
+    ap.add_argument("--provider", choices=PROVIDERS,
+                    default=os.environ.get("FALCO_PROVIDER", "anthropic"),
+                    help="teacher API: anthropic, or openai for any OpenAI compatible endpoint")
+    ap.add_argument("--model", default=os.environ.get("FALCO_MODEL"),
+                    help=f"teacher model (default per provider: {DEFAULT_MODELS})")
+    ap.add_argument("--base-url", default=os.environ.get("FALCO_BASE_URL"),
+                    help="API endpoint, e.g. http://localhost:11434/v1 for Ollama")
+    ap.add_argument("--api-key-env", default=os.environ.get("FALCO_API_KEY_ENV"),
+                    help="env variable holding the API key (default: the SDK's own)")
+    ap.add_argument("--effort", choices=["minimal", "low", "medium", "high", "xhigh", "max"],
+                    help="reasoning effort; anthropic defaults to low, openai sends none")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--max-retries", type=int, default=3, help="SDK level retries per request")
     args = ap.parse_args()
 
-    if anthropic is None:
-        raise SystemExit("the anthropic package is not installed: pip install anthropic")
-    client = anthropic.Anthropic(max_retries=args.max_retries)
+    api_key = None
+    if args.api_key_env:
+        api_key = os.environ.get(args.api_key_env)
+        if not api_key:
+            raise SystemExit(f"the environment variable {args.api_key_env} is empty or unset")
+    effort = args.effort or ("low" if args.provider == "anthropic" else None)
+    teacher = build_teacher(args.provider, args.model or DEFAULT_MODELS[args.provider],
+                            base_url=args.base_url, api_key=api_key, effort=effort,
+                            max_retries=args.max_retries)
 
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     for name, question in questions.items():
@@ -264,8 +256,7 @@ def main():
     states = read_states(args.states) if args.states else []
     if args.generate:
         print(f"Generating {args.generate} synthetic states...")
-        fresh = generate_states(client, args.model, questions, args.domain,
-                                args.generate, args.effort)
+        fresh = generate_states(teacher, questions, args.domain, args.generate)
         with open("generated_states.txt", "a", encoding="utf-8") as f:  # keep them for reuse
             f.write("".join(s.replace("\n", " ") + "\n" for s in fresh))
         states += fresh
@@ -280,7 +271,7 @@ def main():
     ok = failed = 0
     with output.open("a", encoding="utf-8") as f, ThreadPoolExecutor(args.threads) as pool:
         futures = {
-            pool.submit(label_state, client, args.model, missing, state, args.effort): state
+            pool.submit(label_state, teacher, missing, state): state
             for state, missing in work
         }
         for future in as_completed(futures):
