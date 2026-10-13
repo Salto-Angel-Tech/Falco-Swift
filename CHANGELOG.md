@@ -14,7 +14,7 @@ First open-source release.
 ### Added
 
 - `tag.py`: synthetic state generation and labelling with a provider-agnostic teacher
-  (Anthropic, Gemini, and any OpenAI-compatible API), resumable and with retries.
+  (Anthropic, Gemini, OpenRouter, and any OpenAI-compatible API), resumable and with retries.
 - `train.py`: soft-label distillation into a multilingual encoder, split by state, with
   loss/accuracy/ECE metrics and temperature calibration.
 - `main.py`: FastAPI service with `GET /health` and `POST /v1/decide`.
