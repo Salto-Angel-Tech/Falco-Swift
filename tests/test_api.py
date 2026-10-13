@@ -3,8 +3,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-import main
-from schema import validate_question
+pytest.importorskip("torch")  # main imports the model module
+
+import main  # noqa: E402
+from schema import validate_question  # noqa: E402
 
 NOUL = {"type": "noul", "instructions": "the customer is angry"}
 
