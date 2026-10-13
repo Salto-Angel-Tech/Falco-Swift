@@ -248,6 +248,24 @@ returns **400** with the reason.
 
 ---
 
+## Step 4 — Inspect predictions (`evaluate.py`)
+
+Drop a few hand-written cases into a folder, one JSON file each with a `state` field
+(and an optional `id`), and print what the trained model answers for them:
+
+```bash
+python evaluate.py --model model_s1 --questions questions.json --cases cases
+```
+
+```json
+{"id": "refund-1", "state": "I want my money back, the service never worked"}
+```
+
+This is a quick eyeball check, not a metric: use the validation numbers from `train.py`
+to judge quality.
+
+---
+
 ## How the model works
 
 Falco is a **cross-encoder that scores options**, not a fixed-label classifier:
@@ -283,6 +301,7 @@ model_s1/
 | `model.py` | `SystemOne` network, save/load, `Classifier` for inference |
 | `train.py` | Step 2: training, metrics and temperature calibration |
 | `main.py` | Step 3: FastAPI service |
+| `evaluate.py` | Step 4: print the model's answers for hand-written cases |
 | `questions.json` | Example questions (Spanish customer-support domain) |
 | `tests/` | Unit tests for teachers and labelling (no network) |
 
