@@ -1,6 +1,30 @@
 [project]
 name = "falco"
 version = "0.1.0"
+description = "Distill a large LLM teacher into a small, calibrated classifier you can serve over HTTP."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Salto Ángel" }]
+keywords = [
+    "distillation",
+    "knowledge-distillation",
+    "classifier",
+    "calibration",
+    "llm",
+    "fastapi",
+    "transformers",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Framework :: FastAPI",
+]
 requires-python = ">=3.13"
 dependencies = [
     "anthropic>=1.8.0",
@@ -18,11 +42,25 @@ openai = [
     "openai>=3.28.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Salto-Angel-Tech/Falco-Swift"
+Repository = "https://github.com/Salto-Angel-Tech/Falco-Swift"
+Issues = "https://github.com/Salto-Angel-Tech/Falco-Swift/issues"
+
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "ruff>=0.17.0",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

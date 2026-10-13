@@ -1,4 +1,7 @@
-# Falco
+# ![Falco — distill an LLM into a small, fast, calibrated classifier](docs/assets/falco-lockup-dark.png)
+
+[![CI](https://github.com/Salto-Angel-Tech/Falco-Swift/actions/workflows/ci.yml/badge.svg)](https://github.com/Salto-Angel-Tech/Falco-Swift/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Falco distills a large language model into a small, fast and **calibrated** classifier.
 A teacher LLM labels text with probabilities, a multilingual encoder (the "System One"
@@ -248,6 +251,38 @@ Response for the Quick path request — one entry per question (values are illus
 An invalid question (unknown type, missing `instructions`, fewer than 2 options/levels)
 returns **400** with the reason.
 
+### Request limits
+
+Every option of every question is one encoder pass, so a single oversized request could
+exhaust memory. Requests over these limits are rejected with **400** before touching the
+model:
+
+| Env variable | Default | Limit |
+|--------------|---------|-------|
+| `FALCO_MAX_QUESTIONS` | `20` | Questions per request |
+| `FALCO_MAX_OPTIONS` | `20` | Options (or levels) per question |
+| `FALCO_MAX_STATE_CHARS` | `20000` | Characters in the state (JSON states are measured after serialization) |
+
+Values must be positive integers; the app refuses to start otherwise.
+
+---
+
+## Step 4 — Inspect predictions (`evaluate.py`)
+
+Drop a few hand-written cases into a folder, one JSON file each with a `state` field
+(and an optional `id`), and print what the trained model answers for them:
+
+```bash
+python evaluate.py --model model_s1 --questions questions.json --cases cases
+```
+
+```json
+{"id": "refund-1", "state": "I want my money back, the service never worked"}
+```
+
+This is a quick eyeball check, not a metric: use the validation numbers from `train.py`
+to judge quality.
+
 ---
 
 ## How the model works
@@ -285,14 +320,47 @@ model_s1/
 | `model.py` | `SystemOne` network, save/load, `Classifier` for inference |
 | `train.py` | Step 2: training, metrics and temperature calibration |
 | `main.py` | Step 3: FastAPI service |
+| `evaluate.py` | Step 4: print the model's answers for hand-written cases |
 | `questions.json` | Example questions (Spanish customer-support domain) |
-| `tests/` | Unit tests for teachers and labelling (no network) |
+| `tests/` | Unit tests for schema, teachers, labelling, training, model math and API (no network) |
+
+## Limitations
+
+- **Unseen questions are zero-shot.** The API accepts any question, but accuracy and
+  calibration are only measured for the questions the model was trained on.
+- **The student inherits the teacher.** Labels come from an LLM; its biases and mistakes
+  are distilled along with its knowledge. Check the validation metrics and inspect
+  predictions (`evaluate.py`) before relying on the model.
+- **No authentication.** The HTTP service is meant for a trusted network or to sit behind
+  your own gateway; do not expose it directly to the internet.
+- **Bounded requests.** `/v1/decide` rejects requests over the
+  [request limits](#request-limits); states longer than `max_len` tokens are truncated.
+
+## Responsible use
+
+Falco trains a model on answers produced by a third-party LLM. Many providers restrict
+using their outputs to train other models. Before labelling with `tag.py`, review the terms
+of service of the provider and model you use as teacher, and make sure you have the right to
+use the states you send to it (personal or confidential data included).
 
 ## Development
 
 ```bash
 uv sync --extra openai
 uv run pytest
+uv run ruff check . && uv run ruff format --check .
 ```
 
-Tests use fake clients, so they need neither API keys nor a GPU.
+Tests use fake clients and a fake classifier, so they need neither API keys nor a GPU.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first — especially the
+part about not changing the text the model sees — and follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
+
+## License
+
+Copyright 2026 Salto Ángel ([saltoangel.co](https://saltoangel.co)).
+Licensed under the [Apache License 2.0](LICENSE).

@@ -12,8 +12,8 @@ from teachers import (
     build_teacher,
 )
 
-
 # ---------- fakes ----------
+
 
 class FakeAnthropicMessages:
     def __init__(self, response):
@@ -55,6 +55,7 @@ def openai_client(response):
 
 # ---------- anthropic ----------
 
+
 def test_anthropic_teacher_joins_text_blocks_and_sends_effort():
     messages = FakeAnthropicMessages(anthropic_response("answer"))
     teacher = AnthropicTeacher(SimpleNamespace(messages=messages), "claude-sonnet-5", effort="low")
@@ -82,6 +83,7 @@ def test_anthropic_teacher_rejects_truncated_reply():
 
 # ---------- openai compatible ----------
 
+
 def test_openai_teacher_returns_message_content():
     client, completions = openai_client(openai_response("answer"))
     teacher = OpenAICompatibleTeacher(client, "llama3.1", max_tokens_param="max_tokens")
@@ -96,8 +98,9 @@ def test_openai_teacher_returns_message_content():
 
 def test_openai_teacher_sends_effort_and_custom_token_param():
     client, completions = openai_client(openai_response())
-    teacher = OpenAICompatibleTeacher(client, "gpt-5", effort="high",
-                                      max_tokens_param="max_completion_tokens")
+    teacher = OpenAICompatibleTeacher(
+        client, "gpt-5", effort="high", max_tokens_param="max_completion_tokens"
+    )
     teacher.complete("p", 50)
 
     assert completions.calls[0]["reasoning_effort"] == "high"
@@ -121,10 +124,11 @@ def test_openai_teacher_rejects_refusal():
 
 # ---------- retry loop ----------
 
+
 class FlakyTeacher:
-    def __init__(self, failures, error=TransientError("boom")):
+    def __init__(self, failures, error=None):
         self.failures = failures
-        self.error = error
+        self.error = error if error is not None else TransientError("boom")
         self.calls = 0
 
     def complete(self, prompt, max_tokens):
@@ -159,7 +163,17 @@ def test_ask_does_not_retry_fatal_errors():
     assert teacher.calls == 1
 
 
+@pytest.mark.parametrize("attempts", [0, -1])
+def test_ask_rejects_non_positive_attempts(attempts):
+    teacher = FlakyTeacher(failures=0)
+
+    with pytest.raises(ValueError, match="attempts"):
+        ask(teacher, "p", 10, attempts=attempts)
+    assert teacher.calls == 0
+
+
 # ---------- factory ----------
+
 
 def test_build_teacher_rejects_unknown_provider():
     with pytest.raises(ValueError, match="unknown provider"):
@@ -167,8 +181,9 @@ def test_build_teacher_rejects_unknown_provider():
 
 
 def test_build_teacher_openai_compatible_uses_base_url_and_key():
-    teacher = build_teacher("openai", "llama3.1", base_url="http://localhost:11434/v1",
-                            api_key="ollama")
+    teacher = build_teacher(
+        "openai", "llama3.1", base_url="http://localhost:11434/v1", api_key="ollama"
+    )
 
     assert isinstance(teacher, OpenAICompatibleTeacher)
     assert str(teacher.client.base_url).startswith("http://localhost:11434/v1")
@@ -190,6 +205,7 @@ def test_build_teacher_anthropic():
 
 # ---------- gemini ----------
 
+
 def test_build_teacher_gemini_uses_google_endpoint_and_gemini_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
 
@@ -202,7 +218,9 @@ def test_build_teacher_gemini_uses_google_endpoint_and_gemini_key(monkeypatch):
     assert teacher.effort == "low"
 
 
-def test_load_environment_reads_project_dotenv_without_overwriting_exported_values(tmp_path, monkeypatch):
+def test_load_environment_reads_project_dotenv_without_overwriting_exported_values(
+    tmp_path, monkeypatch
+):
     env_file = tmp_path / ".env"
     env_file.write_text("GEMINI_API_KEY=from-dotenv\n")
     monkeypatch.setattr(teachers, "ENV_FILE", env_file)
@@ -234,6 +252,7 @@ def test_build_teacher_gemini_requires_a_key(monkeypatch):
 
 # ---------- openrouter ----------
 
+
 def test_build_teacher_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-test-key")
 
@@ -249,7 +268,9 @@ def test_build_teacher_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
 def test_build_teacher_openrouter_explicit_key_and_base_url_win(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "from-env")
 
-    teacher = build_teacher("openrouter", "m", api_key="explicit", base_url="https://proxy.test/v1/")
+    teacher = build_teacher(
+        "openrouter", "m", api_key="explicit", base_url="https://proxy.test/v1/"
+    )
 
     assert teacher.client.api_key == "explicit"
     assert str(teacher.client.base_url) == "https://proxy.test/v1/"

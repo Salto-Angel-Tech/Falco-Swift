@@ -57,6 +57,7 @@ DIVERSITY_AXES = (
 
 # ---------- parsing helpers (LLM independent, easy to unit test) ----------
 
+
 def extract_json(text: str):
     """Extract the first JSON object/array from a reply, ignoring ```json fences and prose."""
     text = re.sub(r"```(?:json)?", "", text)
@@ -67,7 +68,7 @@ def extract_json(text: str):
     end = text.rfind(closing)
     if end < start:
         raise ValueError("unterminated JSON in the reply")
-    return json.loads(text[start:end + 1])
+    return json.loads(text[start : end + 1])
 
 
 def true_probability(options: list[str], answer) -> float:
@@ -105,11 +106,15 @@ def describe_questions(questions: dict) -> str:
         if question["type"] == "noul":
             fmt = "a number between 0 and 1 = probability that the affirmation is true"
         else:
-            fmt = ("an object {option: probability} summing to 1, with exactly these keys: "
-                   + json.dumps(options_of(question), ensure_ascii=False))
+            fmt = (
+                "an object {option: probability} summing to 1, with exactly these keys: "
+                + json.dumps(options_of(question), ensure_ascii=False)
+            )
             if question["type"] == "score":
                 fmt += " (levels ordered from lowest to highest)"
-        lines.append(f'- "{name}" ({question["type"]}): {question["instructions"]}\n  Format: {fmt}')
+        lines.append(
+            f'- "{name}" ({question["type"]}): {question["instructions"]}\n  Format: {fmt}'
+        )
     return "\n".join(lines)
 
 
@@ -120,8 +125,15 @@ def diversity_hint() -> str:
 
 # ---------- LLM calls ----------
 
-def generate_states(teacher: Teacher, questions: dict, domain: str, n: int,
-                    batch_size: int = 25, max_failures: int = 5) -> list[str]:
+
+def generate_states(
+    teacher: Teacher,
+    questions: dict,
+    domain: str,
+    n: int,
+    batch_size: int = 25,
+    max_failures: int = 5,
+) -> list[str]:
     """Generate synthetic states. Returns fewer than n if generation keeps failing."""
     states: list[str] = []
     seen: set[str] = set()
@@ -172,14 +184,16 @@ def label_state(teacher: Teacher, questions: dict, state: str) -> list[dict]:
         if name not in answer:
             print(f'  warning: the teacher skipped "{name}"')
             continue
-        rows.append({
-            "state": state,
-            "question": name,
-            "type": question["type"],
-            "instructions": question["instructions"],
-            "options": options_of(question),
-            "target": [round(x, 5) for x in to_distribution(question, answer[name])],
-        })
+        rows.append(
+            {
+                "state": state,
+                "question": name,
+                "type": question["type"],
+                "instructions": question["instructions"],
+                "options": options_of(question),
+                "target": [round(x, 5) for x in to_distribution(question, answer[name])],
+            }
+        )
     if not rows:
         raise ValueError("the teacher answered none of the questions")
     return rows
@@ -187,11 +201,13 @@ def label_state(teacher: Teacher, questions: dict, state: str) -> list[dict]:
 
 # ---------- input / resume ----------
 
+
 def read_states(path: str) -> list[str]:
     text = Path(path).read_text(encoding="utf-8")
     if path.endswith(".jsonl"):
-        return [normalize_state(json.loads(line)["state"])
-                for line in text.splitlines() if line.strip()]
+        return [
+            normalize_state(json.loads(line)["state"]) for line in text.splitlines() if line.strip()
+        ]
     return [normalize_state(line) for line in text.splitlines() if line.strip()]
 
 
@@ -211,8 +227,9 @@ def load_done(path: Path) -> dict[str, set[str]]:
     return done
 
 
-def pending_work(states: list[str], questions: dict,
-                 done: dict[str, set[str]]) -> list[tuple[str, dict]]:
+def pending_work(
+    states: list[str], questions: dict, done: dict[str, set[str]]
+) -> list[tuple[str, dict]]:
     """Pair each state with the questions it still misses, keeping input order."""
     work = []
     for state in dict.fromkeys(states):
@@ -223,25 +240,45 @@ def pending_work(states: list[str], questions: dict,
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--questions", required=True, help="JSON file with the questions")
     ap.add_argument("--states", help=".txt file (one per line) or .jsonl with a 'state' field")
-    ap.add_argument("--generate", type=int, default=0, help="number of synthetic states to generate")
+    ap.add_argument(
+        "--generate", type=int, default=0, help="number of synthetic states to generate"
+    )
     ap.add_argument("--domain", default="customer messages sent to a support team")
     ap.add_argument("--output", default="data.jsonl")
-    ap.add_argument("--provider", choices=PROVIDERS,
-                    default=os.environ.get("FALCO_PROVIDER", "anthropic"),
-                    help="teacher API: anthropic, gemini, openrouter, or openai for any OpenAI "
-                         "compatible endpoint")
-    ap.add_argument("--model", default=os.environ.get("FALCO_MODEL"),
-                    help=f"teacher model (default per provider: {DEFAULT_MODELS})")
-    ap.add_argument("--base-url", default=os.environ.get("FALCO_BASE_URL"),
-                    help="API endpoint, e.g. http://localhost:11434/v1 for Ollama")
-    ap.add_argument("--api-key-env", default=os.environ.get("FALCO_API_KEY_ENV"),
-                    help="env variable holding the API key (default: the SDK's own)")
-    ap.add_argument("--effort", choices=["none", "minimal", "low", "medium", "high", "xhigh", "max"],
-                    help="reasoning effort; anthropic defaults to low, other providers send none")
+    ap.add_argument(
+        "--provider",
+        choices=PROVIDERS,
+        default=os.environ.get("FALCO_PROVIDER", "anthropic"),
+        help=(
+            "teacher API: anthropic, gemini, openrouter, or openai for any OpenAI "
+            "compatible endpoint"
+        ),
+    )
+    ap.add_argument(
+        "--model",
+        default=os.environ.get("FALCO_MODEL"),
+        help=f"teacher model (default per provider: {DEFAULT_MODELS})",
+    )
+    ap.add_argument(
+        "--base-url",
+        default=os.environ.get("FALCO_BASE_URL"),
+        help="API endpoint, e.g. http://localhost:11434/v1 for Ollama",
+    )
+    ap.add_argument(
+        "--api-key-env",
+        default=os.environ.get("FALCO_API_KEY_ENV"),
+        help="env variable holding the API key (default: the SDK's own)",
+    )
+    ap.add_argument(
+        "--effort",
+        choices=["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        help="reasoning effort; anthropic defaults to low, other providers send none",
+    )
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--max-retries", type=int, default=3, help="SDK level retries per request")
     args = ap.parse_args()
@@ -252,9 +289,14 @@ def main():
         if not api_key:
             raise SystemExit(f"the environment variable {args.api_key_env} is empty or unset")
     effort = args.effort or ("low" if args.provider == "anthropic" else None)
-    teacher = build_teacher(args.provider, args.model or DEFAULT_MODELS[args.provider],
-                            base_url=args.base_url, api_key=api_key, effort=effort,
-                            max_retries=args.max_retries)
+    teacher = build_teacher(
+        args.provider,
+        args.model or DEFAULT_MODELS[args.provider],
+        base_url=args.base_url,
+        api_key=api_key,
+        effort=effort,
+        max_retries=args.max_retries,
+    )
 
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     for name, question in questions.items():
@@ -278,8 +320,7 @@ def main():
     ok = failed = 0
     with output.open("a", encoding="utf-8") as f, ThreadPoolExecutor(args.threads) as pool:
         futures = {
-            pool.submit(label_state, teacher, missing, state): state
-            for state, missing in work
+            pool.submit(label_state, teacher, missing, state): state for state, missing in work
         }
         for future in as_completed(futures):
             try:

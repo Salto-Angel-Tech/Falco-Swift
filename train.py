@@ -17,13 +17,14 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
-from schema import normalize_state, text_question
 from model import SystemOne, choice_device, log_probs_by_group, tokenizer_method
+from schema import normalize_state, text_question
 
 TARGET_TOLERANCE = 1e-2
 
 
 # ---------- data ----------
+
 
 def usable_row(row) -> bool:
     if not isinstance(row, dict):
@@ -73,21 +74,26 @@ def load_and_split(path: str, val_frac: float, seed: int) -> tuple[list[dict], l
 
 def make_collate(tokenizer, max_len: int):
     """Each row becomes one (state, option text) pair per option, scored as a group."""
+
     def collate(batch):
         pairs, sizes, targets = [], [], []
         for row in batch:
-            pairs += [(row["state"], text_question(row["type"], row["instructions"], option))
-                      for option in row["options"]]
+            pairs += [
+                (row["state"], text_question(row["type"], row["instructions"], option))
+                for option in row["options"]
+            ]
             sizes.append(len(row["options"]))
             targets.append(torch.tensor(row["target"], dtype=torch.float))
         return tokenizer_method(tokenizer, pairs, max_len), sizes, targets
+
     return collate
 
 
 # ---------- loss, metrics, calibration ----------
 
+
 def soft_loss(log_probs: list[torch.Tensor], targets: list[torch.Tensor]) -> torch.Tensor:
-    return torch.stack([-(t * lp).sum() for lp, t in zip(log_probs, targets)]).mean()
+    return torch.stack([-(t * lp).sum() for lp, t in zip(log_probs, targets, strict=True)]).mean()
 
 
 @torch.no_grad()
@@ -107,7 +113,7 @@ def metrics(groups, targets, temperature: float = 1.0, n_bins: int = 10) -> dict
     if not n:
         return {"loss": None, "accuracy": None, "ece": None, "n": 0}
     loss, confidences, hits = 0.0, [], []
-    for group, target in zip(groups, targets):
+    for group, target in zip(groups, targets, strict=True):
         log_probs = torch.log_softmax(group / temperature, dim=-1)
         probs = log_probs.exp()
         loss += -(target * log_probs).sum().item()
@@ -139,8 +145,12 @@ def fit_temperature(groups, targets) -> float:
     def closure():
         opt.zero_grad()
         t = log_t.exp()
-        loss = torch.stack([-(target * torch.log_softmax(group / t, dim=-1)).sum()
-                            for group, target in zip(groups, targets)]).mean()
+        loss = torch.stack(
+            [
+                -(target * torch.log_softmax(group / t, dim=-1)).sum()
+                for group, target in zip(groups, targets, strict=True)
+            ]
+        ).mean()
         loss.backward()
         return loss
 
@@ -154,17 +164,26 @@ def fit_temperature(groups, targets) -> float:
 
 # ---------- training ----------
 
+
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--data", default="data.jsonl")
-    ap.add_argument("--base", default="microsoft/mdeberta-v3-base",
-                    help="base encoder (multilingual). Lighter: distilbert-base-multilingual-cased")
+    ap.add_argument(
+        "--base",
+        default="microsoft/mdeberta-v3-base",
+        help="base encoder (multilingual). Lighter: distilbert-base-multilingual-cased",
+    )
     ap.add_argument("--output", default="model_s1")
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--lr", type=float, default=2e-5)
-    ap.add_argument("--batch", type=int, default=8,
-                    help="questions per batch (each one expands into its options)")
+    ap.add_argument(
+        "--batch",
+        type=int,
+        default=8,
+        help="questions per batch (each one expands into its options)",
+    )
     ap.add_argument("--max-len", type=int, default=384)
     ap.add_argument("--val", type=float, default=0.1)
     ap.add_argument("--seed", type=int, default=42)
@@ -181,10 +200,13 @@ def main():
     train_loader = DataLoader(train_rows, batch_size=args.batch, shuffle=True, collate_fn=collate)
     val_loader = DataLoader(val_rows, batch_size=args.batch * 2, shuffle=False, collate_fn=collate)
 
-    opt = torch.optim.AdamW([
-        {"params": model.encoder.parameters(), "lr": args.lr},
-        {"params": model.head.parameters(), "lr": args.lr * 20},  # the head starts from scratch
-    ], weight_decay=0.01)
+    opt = torch.optim.AdamW(
+        [
+            {"params": model.encoder.parameters(), "lr": args.lr},
+            {"params": model.head.parameters(), "lr": args.lr * 20},  # the head starts from scratch
+        ],
+        weight_decay=0.01,
+    )
     total_steps = max(1, len(train_loader) * args.epochs)
     sched = get_linear_schedule_with_warmup(opt, int(0.06 * total_steps), total_steps)
 
@@ -194,8 +216,7 @@ def main():
         running = 0.0
         for step, (enc, sizes, targets) in enumerate(train_loader, 1):
             logits = model(**{k: v.to(device) for k, v in enc.items()}).float()
-            loss = soft_loss(log_probs_by_group(logits, sizes),
-                             [t.to(device) for t in targets])
+            loss = soft_loss(log_probs_by_group(logits, sizes), [t.to(device) for t in targets])
             opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

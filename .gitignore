@@ -1,5 +1,30 @@
-.env
+# Python
 __pycache__/
 *.pyc
-model_s1/
-model_s2/
+.venv/
+.venv-*/
+dist/
+build/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Secrets
+.env*
+
+# IDE and agent files
+.idea/
+.atl/
+*.code-workspace
+
+# Data and trained models
+data.jsonl
+*.jsonl
+generated_states.txt
+model_*/
+
+# Local evaluation cases and private experiments
+pruebas/
+*_agente.*
