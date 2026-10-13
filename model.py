@@ -30,40 +30,40 @@ class SystemOne(nn.Module):
         self.register_buffer("temperature", torch.ones(1))
 
     def forward(self, input_ids, attention_mask):
-        salida = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        cls = salida.last_hidden_state[:, 0]
+        output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        cls = output.last_hidden_state[:, 0]
         return self.head(cls).squeeze(-1)
 
-    def save(self, folder, tokenizer, mx_len: int) -> None:
-        route = Path(folder)
-        route.mkdir(parents=True, exist_ok=True)
-        self.encoder.save_pretrained(route / "encoder")
-        tokenizer.save_pretrained(route / "encoder")
+    def save(self, folder, tokenizer, max_len: int) -> None:
+        path = Path(folder)
+        path.mkdir(parents=True, exist_ok=True)
+        self.encoder.save_pretrained(path / "encoder")
+        tokenizer.save_pretrained(path / "encoder")
         torch.save(
             {"head": self.head.state_dict(), "temperature": self.temperature.cpu()},
-            route / "head.pt",
+            path / "head.pt",
         )
-        (route / "config.json").write_text(
-            json.dumps({"max_len": mx_len, "temperature": float(self.temperature)})
+        (path / "config.json").write_text(
+            json.dumps({"max_len": max_len, "temperature": float(self.temperature)})
         )
 
     @classmethod
     def load(cls, folder):
-        route = Path(folder)
-        model = cls(encoder=AutoModel.from_pretrained(route / "encoder", dtype=torch.float32))
-        ckpt = torch.load(route / "head.pt", map_location="cpu")
-        model.head.load_state_dict(ckpt["head"])
-        model.temperature.copy_(ckpt["temperature"])
-        tokenizer = AutoTokenizer.from_pretrained(route / "encoder")
-        config = json.loads((route / "config.json").read_text())
+        path = Path(folder)
+        model = cls(encoder=AutoModel.from_pretrained(path / "encoder", dtype=torch.float32))
+        checkpoint = torch.load(path / "head.pt", map_location="cpu")
+        model.head.load_state_dict(checkpoint["head"])
+        model.temperature.copy_(checkpoint["temperature"])
+        tokenizer = AutoTokenizer.from_pretrained(path / "encoder")
+        config = json.loads((path / "config.json").read_text())
         return model, tokenizer, config
 
 
-def tokenizer_method(tokenizer, pares, max_len: int) -> dict:
-    estados, txt = zip(*pares, strict=True)
+def tokenizer_method(tokenizer, pairs, max_len: int) -> dict:
+    states, texts = zip(*pairs, strict=True)
     enc = tokenizer(
-        list(estados),
-        list(txt),
+        list(states),
+        list(texts),
         truncation="only_first",
         max_length=max_len,
         padding=True,
@@ -72,8 +72,8 @@ def tokenizer_method(tokenizer, pares, max_len: int) -> dict:
     return {"input_ids": enc["input_ids"], "attention_mask": enc["attention_mask"]}
 
 
-def log_probs_by_group(logits, weight, temperature=1.0):
-    return [torch.log_softmax(g / temperature, dim=-1) for g in torch.split(logits, weight)]
+def log_probs_by_group(logits, sizes, temperature=1.0):
+    return [torch.log_softmax(g / temperature, dim=-1) for g in torch.split(logits, sizes)]
 
 
 def entropy_normalize(probs: list[float]) -> float:
@@ -95,22 +95,22 @@ class Classifier:
         if not questions:
             return {}
         state = normalize_state(state)
-        names, odds, weight = [], [], []
+        names, pairs, sizes = [], [], []
         for name, question in questions.items():
             validate_question(name, question)
             options = options_of(question)
             names.append(name)
-            weight.append(len(options))
-            odds += [
+            sizes.append(len(options))
+            pairs += [
                 (state, text_question(question["type"], question["instructions"], o))
                 for o in options
             ]
         enc = {
             k: v.to(self.device)
-            for k, v in tokenizer_method(self.tokenizer, odds, self.max_len).items()
+            for k, v in tokenizer_method(self.tokenizer, pairs, self.max_len).items()
         }
         logits = self.model(**enc).float()
-        groups = log_probs_by_group(logits, weight, temperature=self.config.get("temperature", 1.0))
+        groups = log_probs_by_group(logits, sizes, temperature=self.config.get("temperature", 1.0))
 
         result = {}
 
@@ -124,10 +124,10 @@ class Classifier:
             if question["type"] == "noul":
                 result[name] = {"type": "noul", "noul": round(p[0], 4)}
             elif question["type"] == "choice":
-                better = max(range(len(p)), key=p.__getitem__)
+                best = max(range(len(p)), key=p.__getitem__)
                 result[name] = {
                     "type": "choice",
-                    "choice": options[better],
+                    "choice": options[best],
                     "probability": distribution,
                     "confidence": confidence,
                 }
