@@ -246,6 +246,20 @@ Response for the Quick path request — one entry per question (values are illus
 An invalid question (unknown type, missing `instructions`, fewer than 2 options/levels)
 returns **400** with the reason.
 
+### Request limits
+
+Every option of every question is one encoder pass, so a single oversized request could
+exhaust memory. Requests over these limits are rejected with **400** before touching the
+model:
+
+| Env variable | Default | Limit |
+|--------------|---------|-------|
+| `FALCO_MAX_QUESTIONS` | `20` | Questions per request |
+| `FALCO_MAX_OPTIONS` | `20` | Options (or levels) per question |
+| `FALCO_MAX_STATE_CHARS` | `20000` | Characters in the state (JSON states are measured after serialization) |
+
+Values must be positive integers; the app refuses to start otherwise.
+
 ---
 
 ## Step 4 — Inspect predictions (`evaluate.py`)
