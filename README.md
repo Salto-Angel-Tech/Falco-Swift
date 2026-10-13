@@ -5,16 +5,16 @@ A teacher LLM labels text with probabilities, a multilingual encoder (the "Syste
 student) learns to reproduce them, and a FastAPI service answers your questions about
 new text in milliseconds, without calling any LLM at inference time.
 
-```
-questions.json ──► tag.py ──► data.jsonl ──► train.py ──► model_s1/ ──► main.py (HTTP)
-                  (teacher LLM)             (student encoder)          /v1/decide
+```mermaid
+flowchart LR
+    questions["questions.json"] --> tag["tag.py<br/>(teacher LLM)"] --> data["data.jsonl"] --> train["train.py<br/>(student encoder)"] --> model["model_s1/"] --> main["main.py (HTTP)<br/>/v1/decide"]
 ```
 
 ## Quick path
 
 ```bash
-uv sync --extra openai                     # dependencies (+ OpenAI/Gemini support)
-export GEMINI_API_KEY=...                  # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+uv sync --extra openai                     # dependencies (+ OpenAI/Gemini/OpenRouter support)
+# Create .env with GEMINI_API_KEY=...       # or export ANTHROPIC_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY
 
 # 1. Label: generate 200 synthetic states and label them with the teacher
 python tag.py --questions questions.json --generate 200 --provider gemini
@@ -88,15 +88,22 @@ teacher's probability distribution over the options.
 
 ### Choosing a teacher
 
-The teacher is provider-agnostic. Three providers cover practically every model:
+The teacher is provider-agnostic. Four providers cover practically every model:
 
 | `--provider` | Talks to | API key (default) | Default `--model` |
 |--------------|----------|-------------------|-------------------|
 | `anthropic` (default) | Anthropic Messages API | `ANTHROPIC_API_KEY` | `claude-sonnet-5` |
 | `gemini` | Google's OpenAI-compatible endpoint | `GEMINI_API_KEY` | `gemini-3.8-flash` |
+| `openrouter` | OpenRouter's OpenAI-compatible endpoint | `OPENROUTER_API_KEY` | `deepseek/deepseek-chat` |
 | `openai` | Any OpenAI-compatible Chat Completions API | `OPENAI_API_KEY` | `gpt-5` |
 
-`--provider openai` plus `--base-url` reaches any compatible server:
+```bash
+# OpenRouter (model ids are "<org>/<model>", e.g. anthropic/claude-sonnet-5, openai/gpt-5)
+python tag.py --questions questions.json --generate 200 --provider openrouter \
+    --model deepseek/deepseek-chat
+```
+
+`--provider openai` plus `--base-url` reaches any other compatible server:
 
 | Server | `--base-url` |
 |--------|--------------|
@@ -105,17 +112,12 @@ The teacher is provider-agnostic. Three providers cover practically every model:
 | LM Studio | `http://localhost:1234/v1` |
 | vLLM | `http://localhost:8000/v1` |
 | Groq | `https://api.groq.com/openai/v1` |
-| OpenRouter | `https://openrouter.ai/api/v1` |
 | DeepSeek | `https://api.deepseek.com/v1` |
 
 ```bash
 # Local model with Ollama (no key needed)
 python tag.py --questions questions.json --generate 200 --provider openai \
     --base-url http://localhost:11434/v1 --model llama3.1
-
-# OpenRouter, key stored in a custom variable
-python tag.py --questions questions.json --states states.txt --provider openai \
-    --base-url https://openrouter.ai/api/v1 --model <model-id> --api-key-env OPENROUTER_API_KEY
 ```
 
 ### Options
@@ -127,7 +129,7 @@ python tag.py --questions questions.json --states states.txt --provider openai \
 | `--generate N` | — | `0` | Generate `N` synthetic states with the teacher |
 | `--domain` | — | customer support messages | What the synthetic states should look like |
 | `--output` | — | `data.jsonl` | Training set (appended, resumable) |
-| `--provider` | `FALCO_PROVIDER` | `anthropic` | `anthropic`, `gemini` or `openai` |
+| `--provider` | `FALCO_PROVIDER` | `anthropic` | `anthropic`, `gemini`, `openrouter` or `openai` |
 | `--model` | `FALCO_MODEL` | per provider | Teacher model id |
 | `--base-url` | `FALCO_BASE_URL` | provider default | API endpoint |
 | `--api-key-env` | `FALCO_API_KEY_ENV` | SDK default | Name of the env variable holding the key |
@@ -278,7 +280,7 @@ model_s1/
 | File | Role |
 |------|------|
 | `schema.py` | Question validation, option lists, question-to-text, state normalization |
-| `teachers.py` | Teacher port and adapters (Anthropic, OpenAI-compatible, Gemini) with retries |
+| `teachers.py` | Teacher port and adapters (Anthropic, OpenAI-compatible, Gemini, OpenRouter) with retries |
 | `tag.py` | Step 1: synthetic generation and labelling |
 | `model.py` | `SystemOne` network, save/load, `Classifier` for inference |
 | `train.py` | Step 2: training, metrics and temperature calibration |
