@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     app.state.classifier = None
 
 
-app = FastAPI(title="My System One", lifespan=lifespan)
+app = FastAPI(title="Falco", lifespan=lifespan)
 
 
 class DecideRequest(BaseModel):

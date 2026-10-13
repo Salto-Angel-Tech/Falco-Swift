@@ -113,6 +113,8 @@ class OpenAICompatibleTeacher:
 
 def ask(teacher: Teacher, prompt: str, max_tokens: int, attempts: int = 4) -> str:
     """One teacher call. Retries transient failures only; other errors surface immediately."""
+    if attempts < 1:
+        raise ValueError(f"attempts must be at least 1, got {attempts}")
     for attempt in range(attempts):
         try:
             return teacher.complete(prompt, max_tokens)

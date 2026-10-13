@@ -162,6 +162,15 @@ def test_ask_does_not_retry_fatal_errors():
     assert teacher.calls == 1
 
 
+@pytest.mark.parametrize("attempts", [0, -1])
+def test_ask_rejects_non_positive_attempts(attempts):
+    teacher = FlakyTeacher(failures=0)
+
+    with pytest.raises(ValueError, match="attempts"):
+        ask(teacher, "p", 10, attempts=attempts)
+    assert teacher.calls == 0
+
+
 # ---------- factory ----------
 
 
