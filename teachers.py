@@ -79,8 +79,9 @@ class AnthropicTeacher:
 
 
 class OpenAICompatibleTeacher:
-    def __init__(self, client, model: str, effort: str | None = None,
-                 max_tokens_param: str = "max_tokens"):
+    def __init__(
+        self, client, model: str, effort: str | None = None, max_tokens_param: str = "max_tokens"
+    ):
         self.client = client
         self.model = model
         self.effort = effort
@@ -118,14 +119,20 @@ def ask(teacher: Teacher, prompt: str, max_tokens: int, attempts: int = 4) -> st
         except TransientError as error:
             if attempt == attempts - 1:
                 raise RuntimeError(f"the teacher failed {attempts} times") from error
-            delay = 2 ** attempt + random.random()
+            delay = 2**attempt + random.random()
             print(f"  warning: {error}, retrying in {delay:.0f}s")
             time.sleep(delay)
 
 
-def build_teacher(provider: str, model: str, *, base_url: str | None = None,
-                  api_key: str | None = None, effort: str | None = None,
-                  max_retries: int = 3) -> Teacher:
+def build_teacher(
+    provider: str,
+    model: str,
+    *,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    effort: str | None = None,
+    max_retries: int = 3,
+) -> Teacher:
     """Create the teacher for a provider. ``api_key`` falls back to the SDK's env variable."""
     if provider == "anthropic":
         if anthropic is None:

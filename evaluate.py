@@ -16,8 +16,9 @@ from model import Classifier
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--model", default="model_s1")
     ap.add_argument("--questions", default="questions.json")
     ap.add_argument("--cases", default="cases", help="folder with *.json test cases")
