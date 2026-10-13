@@ -1,5 +1,8 @@
 # Falco
 
+[![CI](https://github.com/Salto-Angel-Tech/Falco-Swift/actions/workflows/ci.yml/badge.svg)](https://github.com/Salto-Angel-Tech/Falco-Swift/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Falco distills a large language model into a small, fast and **calibrated** classifier.
 A teacher LLM labels text with probabilities, a multilingual encoder (the "System One"
 student) learns to reproduce them, and a FastAPI service answers your questions about
@@ -317,13 +320,45 @@ model_s1/
 | `main.py` | Step 3: FastAPI service |
 | `evaluate.py` | Step 4: print the model's answers for hand-written cases |
 | `questions.json` | Example questions (Spanish customer-support domain) |
-| `tests/` | Unit tests for teachers and labelling (no network) |
+| `tests/` | Unit tests for schema, teachers, labelling, training, model math and API (no network) |
+
+## Limitations
+
+- **Unseen questions are zero-shot.** The API accepts any question, but accuracy and
+  calibration are only measured for the questions the model was trained on.
+- **The student inherits the teacher.** Labels come from an LLM; its biases and mistakes
+  are distilled along with its knowledge. Check the validation metrics and inspect
+  predictions (`evaluate.py`) before relying on the model.
+- **No authentication.** The HTTP service is meant for a trusted network or to sit behind
+  your own gateway; do not expose it directly to the internet.
+- **Bounded requests.** `/v1/decide` rejects requests over the
+  [request limits](#request-limits); states longer than `max_len` tokens are truncated.
+
+## Responsible use
+
+Falco trains a model on answers produced by a third-party LLM. Many providers restrict
+using their outputs to train other models. Before labelling with `tag.py`, review the terms
+of service of the provider and model you use as teacher, and make sure you have the right to
+use the states you send to it (personal or confidential data included).
 
 ## Development
 
 ```bash
 uv sync --extra openai
 uv run pytest
+uv run ruff check . && uv run ruff format --check .
 ```
 
-Tests use fake clients, so they need neither API keys nor a GPU.
+Tests use fake clients and a fake classifier, so they need neither API keys nor a GPU.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first — especially the
+part about not changing the text the model sees — and follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
+
+## License
+
+Copyright 2026 Salto Ángel ([saltoangel.co](https://saltoangel.co)).
+Licensed under the [Apache License 2.0](LICENSE).
