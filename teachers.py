@@ -5,10 +5,12 @@ cover practically every provider:
 
 - ``anthropic``: the Claude Messages API.
 - ``openai``: any OpenAI compatible Chat Completions endpoint (OpenAI, Groq,
-  OpenRouter, DeepSeek, Mistral, Together, Ollama, vLLM, LM Studio...),
-  selected with ``base_url``.
+  DeepSeek, Mistral, Together, Ollama, vLLM, LM Studio...), selected with
+  ``base_url``.
 - ``gemini``: Google Gemini through its OpenAI compatible endpoint, preset with
   Google's URL and the ``GEMINI_API_KEY`` variable.
+- ``openrouter``: OpenRouter's OpenAI compatible endpoint, preset with
+  OpenRouter's URL and the ``OPENROUTER_API_KEY`` variable.
 
 Adapters raise ``TransientError`` for failures worth retrying; ``ask`` owns the
 retry loop so every backend behaves the same.
@@ -17,7 +19,10 @@ retry loop so every backend behaves the same.
 import os
 import random
 import time
+from pathlib import Path
 from typing import Protocol
+
+from dotenv import load_dotenv
 
 try:
     import anthropic
@@ -29,9 +34,20 @@ try:
 except ModuleNotFoundError:
     openai = None
 
-PROVIDERS = ("anthropic", "openai", "gemini")
+PROVIDERS = ("anthropic", "openai", "gemini", "openrouter")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 GEMINI_KEY_ENV = "GEMINI_API_KEY"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/"
+OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
+ENV_FILE = Path(__file__).with_name(".env")
+
+
+def load_environment() -> None:
+    """Load project-local environment variables without replacing exported values."""
+    load_dotenv(ENV_FILE)
+
+
+load_environment()
 
 
 class TransientError(Exception):
@@ -141,7 +157,7 @@ def build_teacher(
             raise SystemExit("the anthropic package is not installed: pip install anthropic")
         client = anthropic.Anthropic(api_key=api_key, base_url=base_url, max_retries=max_retries)
         return AnthropicTeacher(client, model, effort)
-    if provider in ("openai", "gemini"):
+    if provider in ("openai", "gemini", "openrouter"):
         if openai is None:
             raise SystemExit("the openai package is not installed: pip install 'falco[openai]'")
         if provider == "gemini":
@@ -149,6 +165,11 @@ def build_teacher(
             api_key = api_key or os.environ.get(GEMINI_KEY_ENV)
             if not api_key:
                 raise SystemExit(f"set {GEMINI_KEY_ENV} or pass --api-key-env for Gemini")
+        elif provider == "openrouter":
+            base_url = base_url or OPENROUTER_BASE_URL
+            api_key = api_key or os.environ.get(OPENROUTER_KEY_ENV)
+            if not api_key:
+                raise SystemExit(f"set {OPENROUTER_KEY_ENV} or pass --api-key-env for OpenRouter")
         # Local servers (Ollama, vLLM, LM Studio) accept any key but the SDK demands one.
         elif api_key is None and base_url and not os.environ.get("OPENAI_API_KEY"):
             api_key = "not-needed"

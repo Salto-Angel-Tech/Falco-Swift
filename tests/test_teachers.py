@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -217,6 +218,22 @@ def test_build_teacher_gemini_uses_google_endpoint_and_gemini_key(monkeypatch):
     assert teacher.effort == "low"
 
 
+def test_load_environment_reads_project_dotenv_without_overwriting_exported_values(
+    tmp_path, monkeypatch
+):
+    env_file = tmp_path / ".env"
+    env_file.write_text("GEMINI_API_KEY=from-dotenv\n")
+    monkeypatch.setattr(teachers, "ENV_FILE", env_file)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    teachers.load_environment()
+
+    assert os.environ["GEMINI_API_KEY"] == "from-dotenv"
+    monkeypatch.setenv("GEMINI_API_KEY", "exported-value")
+    teachers.load_environment()
+    assert os.environ["GEMINI_API_KEY"] == "exported-value"
+
+
 def test_build_teacher_gemini_explicit_key_and_base_url_win(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "from-env")
 
@@ -231,3 +248,36 @@ def test_build_teacher_gemini_requires_a_key(monkeypatch):
 
     with pytest.raises(SystemExit, match="GEMINI_API_KEY"):
         build_teacher("gemini", "m")
+
+
+# ---------- openrouter ----------
+
+
+def test_build_teacher_openrouter_uses_openrouter_endpoint_and_key(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-test-key")
+
+    teacher = build_teacher("openrouter", "deepseek/deepseek-chat", effort="low")
+
+    assert isinstance(teacher, OpenAICompatibleTeacher)
+    assert str(teacher.client.base_url) == teachers.OPENROUTER_BASE_URL
+    assert teacher.client.api_key == "openrouter-test-key"
+    assert teacher.max_tokens_param == "max_tokens"
+    assert teacher.effort == "low"
+
+
+def test_build_teacher_openrouter_explicit_key_and_base_url_win(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "from-env")
+
+    teacher = build_teacher(
+        "openrouter", "m", api_key="explicit", base_url="https://proxy.test/v1/"
+    )
+
+    assert teacher.client.api_key == "explicit"
+    assert str(teacher.client.base_url) == "https://proxy.test/v1/"
+
+
+def test_build_teacher_openrouter_requires_a_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with pytest.raises(SystemExit, match="OPENROUTER_API_KEY"):
+        build_teacher("openrouter", "m")
