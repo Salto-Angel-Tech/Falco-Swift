@@ -1,3 +1,5 @@
-.env__pycache__/
-*.pyc
 .env
+__pycache__/
+*.pyc
+model_s1/
+model_s2/
