@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Modules moved into the `falco` package under `src/`; use the `falco` CLI
+  (`falco tag`, `falco train`, `falco serve`, `falco evaluate`, `falco studio`).
+
 ## [0.1.0] - 2026-10-13
 
 First open-source release.
