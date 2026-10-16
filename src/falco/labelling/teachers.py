@@ -39,7 +39,7 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 GEMINI_KEY_ENV = "GEMINI_API_KEY"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/"
 OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
-ENV_FILE = Path(__file__).with_name(".env")
+ENV_FILE = Path.cwd() / ".env"
 
 
 def load_environment() -> None:

@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import teachers
-from teachers import (
+import falco.labelling.teachers as teachers
+from falco.labelling.teachers import (
     AnthropicTeacher,
     OpenAICompatibleTeacher,
     TransientError,

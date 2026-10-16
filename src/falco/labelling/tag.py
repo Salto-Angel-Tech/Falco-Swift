@@ -10,13 +10,13 @@ DeepSeek, Ollama, vLLM, LM Studio...). Flags fall back to FALCO_PROVIDER,
 FALCO_MODEL, FALCO_BASE_URL and FALCO_API_KEY_ENV.
 
 Examples:
-    python tag.py --questions questions.json --generate 200
-    python tag.py --questions questions.json --states states.txt --output data.jsonl
-    python tag.py --questions questions.json --generate 200 --provider openai --model gpt-5
-    python tag.py --questions questions.json --generate 200 --provider openai \\
+    falco tag --questions questions.json --generate 200
+    falco tag --questions questions.json --states states.txt --output data.jsonl
+    falco tag --questions questions.json --generate 200 --provider openai --model gpt-5
+    falco tag --questions questions.json --generate 200 --provider openai \\
         --base-url http://localhost:11434/v1 --model llama3.1
-    python tag.py --questions questions.json --generate 200 --provider gemini
-    python tag.py --questions questions.json --generate 200 --provider openrouter \\
+    falco tag --questions questions.json --generate 200 --provider gemini
+    falco tag --questions questions.json --generate 200 --provider openrouter \\
         --model deepseek/deepseek-chat
 """
 
@@ -28,8 +28,8 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from schema import normalize_state, options_of, validate_question
-from teachers import PROVIDERS, Teacher, ask, build_teacher
+from falco.labelling.teachers import PROVIDERS, Teacher, ask, build_teacher
+from falco.questions.schema import normalize_state, options_of, validate_question
 
 DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-5",
@@ -239,7 +239,7 @@ def pending_work(
     return work
 
 
-def main():
+def main(argv: list[str] | None = None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -281,7 +281,7 @@ def main():
     )
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--max-retries", type=int, default=3, help="SDK level retries per request")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     api_key = None
     if args.api_key_env:

@@ -5,7 +5,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from train import fit_temperature, load_and_split, metrics, usable_row  # noqa: E402
+from falco.training.train import fit_temperature, load_and_split, metrics, usable_row  # noqa: E402
 
 ROW = {
     "state": "my server is down",

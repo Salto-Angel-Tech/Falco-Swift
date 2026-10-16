@@ -1,6 +1,6 @@
 """Step 3: serve the trained student model over HTTP.
 
-    uvicorn main:app --port 8000
+    falco serve --port 8000
 
 The model folder comes from the MODEL_S1 environment variable (default: model_s1).
 Request size limits come from FALCO_MAX_QUESTIONS, FALCO_MAX_OPTIONS and
@@ -14,8 +14,8 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from model import Classifier
-from schema import normalize_state, options_of, validate_question
+from falco.inference.model import Classifier
+from falco.questions.schema import normalize_state, options_of, validate_question
 
 
 def env_limit(name: str, default: int) -> int:
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         app.state.classifier = Classifier(MODEL_FOLDER)
     except (OSError, KeyError) as error:
         raise RuntimeError(
-            f"cannot load the model from {MODEL_FOLDER!r}: run train.py first "
+            f"cannot load the model from {MODEL_FOLDER!r}: run `falco train` first "
             f"or point MODEL_S1 at a trained folder ({type(error).__name__}: {error})"
         ) from error
     yield

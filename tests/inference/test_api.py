@@ -3,10 +3,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-pytest.importorskip("torch")  # main imports the model module
+pytest.importorskip("torch")  # the API imports the model module
 
-import main  # noqa: E402
-from schema import validate_question  # noqa: E402
+import falco.inference.api as api  # noqa: E402
+from falco.questions.schema import validate_question  # noqa: E402
 
 NOUL = {"type": "noul", "instructions": "the customer is angry"}
 
@@ -30,8 +30,8 @@ class FakeClassifier:
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(main, "Classifier", FakeClassifier)
-    with TestClient(main.app) as test_client:
+    monkeypatch.setattr(api, "Classifier", FakeClassifier)
+    with TestClient(api.app) as test_client:
         yield test_client
 
 
@@ -46,7 +46,7 @@ def test_health_reports_the_loaded_model(client):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "model": main.MODEL_FOLDER,
+        "model": api.MODEL_FOLDER,
         "device": "cpu",
         "max_len": 384,
         "temperature": 1.5,
@@ -68,7 +68,7 @@ def test_decide_rejects_an_invalid_question(client):
 
 
 def test_decide_rejects_too_many_questions(client, monkeypatch):
-    monkeypatch.setattr(main, "MAX_QUESTIONS", 2)
+    monkeypatch.setattr(api, "MAX_QUESTIONS", 2)
 
     response = decide(client, questions={f"q{i}": NOUL for i in range(3)})
 
@@ -78,14 +78,14 @@ def test_decide_rejects_too_many_questions(client, monkeypatch):
 
 
 def test_decide_accepts_exactly_the_question_limit(client, monkeypatch):
-    monkeypatch.setattr(main, "MAX_QUESTIONS", 2)
+    monkeypatch.setattr(api, "MAX_QUESTIONS", 2)
 
     assert decide(client, questions={f"q{i}": NOUL for i in range(2)}).status_code == 200
 
 
 @pytest.mark.parametrize("field", ["options", "levels"])
 def test_decide_rejects_too_many_options(client, monkeypatch, field):
-    monkeypatch.setattr(main, "MAX_OPTIONS", 3)
+    monkeypatch.setattr(api, "MAX_OPTIONS", 3)
     question_type = "choice" if field == "options" else "score"
     question = {"type": question_type, "instructions": "x", field: ["a", "b", "c", "d"]}
 
@@ -98,7 +98,7 @@ def test_decide_rejects_too_many_options(client, monkeypatch, field):
 
 
 def test_decide_rejects_a_state_that_is_too_long(client, monkeypatch):
-    monkeypatch.setattr(main, "MAX_STATE_CHARS", 10)
+    monkeypatch.setattr(api, "MAX_STATE_CHARS", 10)
 
     response = decide(client, state="x" * 11)
 
@@ -108,7 +108,7 @@ def test_decide_rejects_a_state_that_is_too_long(client, monkeypatch):
 
 
 def test_decide_measures_json_states_after_serialization(client, monkeypatch):
-    monkeypatch.setattr(main, "MAX_STATE_CHARS", 10)
+    monkeypatch.setattr(api, "MAX_STATE_CHARS", 10)
 
     response = decide(client, state={"message": "short"})
 
@@ -120,13 +120,13 @@ def test_limits_default_values(monkeypatch):
     for name in ("FALCO_MAX_QUESTIONS", "FALCO_MAX_OPTIONS", "FALCO_MAX_STATE_CHARS"):
         monkeypatch.delenv(name, raising=False)
 
-    assert main.env_limit("FALCO_MAX_QUESTIONS", 20) == 20
+    assert api.env_limit("FALCO_MAX_QUESTIONS", 20) == 20
 
 
 def test_limits_read_from_the_environment(monkeypatch):
     monkeypatch.setenv("FALCO_MAX_QUESTIONS", "5")
 
-    assert main.env_limit("FALCO_MAX_QUESTIONS", 20) == 5
+    assert api.env_limit("FALCO_MAX_QUESTIONS", 20) == 5
 
 
 @pytest.mark.parametrize("value", ["0", "-3", "many"])
@@ -134,4 +134,4 @@ def test_limits_reject_invalid_environment_values(monkeypatch, value):
     monkeypatch.setenv("FALCO_MAX_QUESTIONS", value)
 
     with pytest.raises(ValueError, match="FALCO_MAX_QUESTIONS"):
-        main.env_limit("FALCO_MAX_QUESTIONS", 20)
+        api.env_limit("FALCO_MAX_QUESTIONS", 20)

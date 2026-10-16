@@ -1,6 +1,6 @@
 """Step 4: manually inspect the trained model's predictions.
 
-    python evaluate.py --model model_s1 --questions questions.json --cases cases
+    falco evaluate --model model_s1 --questions questions.json --cases cases
 
 Loads every *.json case under --cases (each one needs a "state" field and may
 carry an "id"), runs it through the classifier with the given questions, and
@@ -12,17 +12,17 @@ import argparse
 import json
 from pathlib import Path
 
-from model import Classifier
+from falco.inference.model import Classifier
 
 
-def main():
+def main(argv: list[str] | None = None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--model", default="model_s1")
     ap.add_argument("--questions", default="questions.json")
     ap.add_argument("--cases", default="cases", help="folder with *.json test cases")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     classifier = Classifier(args.model)

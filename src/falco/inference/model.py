@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from transformers import AutoModel, AutoTokenizer
 
-from schema import normalize_state, options_of, text_question, validate_question
+from falco.questions.schema import normalize_state, options_of, text_question, validate_question
 
 
 def choice_device() -> str:

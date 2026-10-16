@@ -1,6 +1,6 @@
 """Step 2: train the student model and calibrate its probabilities.
 
-    python train.py --data data.jsonl --output model_s1
+    falco train --data data.jsonl --output model_s1
 
 Loss: cross entropy against the teacher's soft probabilities (not just the winning
 option), so the student learns the uncertainty too. Afterwards a single temperature
@@ -17,8 +17,8 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
-from model import SystemOne, choice_device, log_probs_by_group, tokenizer_method
-from schema import normalize_state, text_question
+from falco.inference.model import SystemOne, choice_device, log_probs_by_group, tokenizer_method
+from falco.questions.schema import normalize_state, text_question
 
 TARGET_TOLERANCE = 1e-2
 
@@ -59,7 +59,7 @@ def load_and_split(path: str, val_frac: float, seed: int) -> tuple[list[dict], l
     if dropped:
         print(f"  {dropped} unusable rows ignored")
     if not rows:
-        raise SystemExit(f"no usable rows in {path}: run tag.py first")
+        raise SystemExit(f"no usable rows in {path}: run `falco tag` first")
 
     states = sorted({row["state"] for row in rows})
     if len(states) < 2:
@@ -165,7 +165,7 @@ def fit_temperature(groups, targets) -> float:
 # ---------- training ----------
 
 
-def main():
+def main(argv: list[str] | None = None):
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -187,7 +187,7 @@ def main():
     ap.add_argument("--max-len", type=int, default=384)
     ap.add_argument("--val", type=float, default=0.1)
     ap.add_argument("--seed", type=int, default=42)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     torch.manual_seed(args.seed)
     device = choice_device()

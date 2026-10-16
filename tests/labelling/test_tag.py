@@ -1,6 +1,6 @@
 import json
 
-from tag import generate_states, label_state
+from falco.labelling.tag import generate_states, label_state
 
 
 class ScriptedTeacher:

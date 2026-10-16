@@ -2,7 +2,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from model import entropy_normalize, log_probs_by_group  # noqa: E402
+from falco.inference.model import entropy_normalize, log_probs_by_group  # noqa: E402
 
 
 @pytest.mark.parametrize(

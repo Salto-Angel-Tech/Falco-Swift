@@ -1,6 +1,6 @@
 import pytest
 
-from schema import normalize_state, options_of, text_question, validate_question
+from falco.questions.schema import normalize_state, options_of, text_question, validate_question
 
 
 @pytest.mark.parametrize(
