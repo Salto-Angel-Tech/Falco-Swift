@@ -1,0 +1,266 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Self-hosted fonts (no external CDN): Inter for UI text, JetBrains Mono for code and stats. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+/* Light "console" theme by default; the dark equivalents apply under a `.dark` ancestor. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  /* ----- Falco console palette ----- */
+  --surface-bright: #ffffff;
+  --surface-container-low: #f3f4f3;
+  --surface-container: #f1f3f5;
+  --surface-container-high: #e9ecef;
+  --surface-container-highest: #e2e2e2;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --line: #e2e8f0;
+
+  --brand: #004532;
+  --brand-hover: #047857;
+  --brand-tint: #ecfdf5;
+  --brand-bright: #22c55e;
+
+  --secondary-tone: #515f74;
+  --secondary-container: #d5e3fd;
+  --on-secondary-container: #57657b;
+  --secondary-fixed-dim: #b9c7e0;
+  --tertiary-fixed: #dae2fd;
+  --on-tertiary-fixed: #3f465c;
+
+  --error: #dc2626;
+  --error-surface: #fee2e2;
+  --error-text: #991b1b;
+  --warning-tone: #d97706;
+  --warning-surface: #fef3c7;
+  --warning-text: #92400e;
+  --success: #059669;
+
+  --code: #0f172a;
+  --code-foreground: #f3f4f3;
+  --shadow-soft: 0 1px 8px rgba(0, 0, 0, 0.04);
+
+  --radius: 4px;
+
+  /* ----- shadcn semantic tokens ----- */
+  --background: #f9f9f8;
+  --foreground: var(--text-primary);
+  --card: var(--surface-bright);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-bright);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --primary-hover: var(--brand-hover);
+  --secondary: var(--surface-container);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-container);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--surface-container-high);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--error);
+  --warning: var(--warning-tone);
+  --info: var(--secondary-tone);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand-hover);
+
+  --chart-1: #004532;
+  --chart-2: #047857;
+  --chart-3: #22c55e;
+  --chart-4: #515f74;
+  --chart-5: #d97706;
+
+  --sidebar: var(--surface-bright);
+  --sidebar-foreground: var(--text-secondary);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--surface-container-high);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--brand-hover);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --surface-bright: #151b24;
+  --surface-container-low: #11161e;
+  --surface-container: #1a212b;
+  --surface-container-high: #232b37;
+  --surface-container-highest: #2e3744;
+  --text-primary: #e8edf3;
+  --text-secondary: #9aa8ba;
+  --text-muted: #6b7a8f;
+  --line: #273140;
+
+  --brand: #34d399;
+  --brand-hover: #6ee7b7;
+  --brand-tint: rgba(52, 211, 153, 0.12);
+  --brand-bright: #22c55e;
+
+  --secondary-tone: #a9b8cf;
+  --secondary-container: #2b3a55;
+  --on-secondary-container: #c3d2ec;
+  --secondary-fixed-dim: #4a5a76;
+  --tertiary-fixed: #2d3550;
+  --on-tertiary-fixed: #c9d3f5;
+
+  --error: #f87171;
+  --error-surface: rgba(248, 113, 113, 0.14);
+  --error-text: #fca5a5;
+  --warning-tone: #fbbf24;
+  --warning-surface: rgba(251, 191, 36, 0.14);
+  --warning-text: #fcd34d;
+  --success: #34d399;
+
+  --code: #0a0e14;
+  --code-foreground: #e8edf3;
+  --shadow-soft: 0 1px 8px rgba(0, 0, 0, 0.3);
+
+  --background: #0d1117;
+  --primary-foreground: #04150f;
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Headings use the UI font; kept as an alias so existing `font-display` classes still work. */
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 8px;
+
+  --shadow-card: var(--shadow-soft);
+
+  /* Type scale */
+  --text-body: 13.5px;
+  --text-body--line-height: 20px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-label-caps: 11px;
+  --text-label-caps--line-height: 16px;
+  --text-headline-sm: 16px;
+  --text-headline-sm--line-height: 22px;
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-stat-lg: 24px;
+  --text-stat-lg--line-height: 30px;
+  --text-code-base: 12.5px;
+  --text-code-base--line-height: 20px;
+  --text-code-sm: 11px;
+  --text-code-sm--line-height: 16px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Console surfaces and tones */
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-high: var(--surface-container-high);
+  --color-surface-highest: var(--surface-container-highest);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-bright: var(--brand-bright);
+  --color-secondary-tone: var(--secondary-tone);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-secondary-fixed-dim: var(--secondary-fixed-dim);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-on-tertiary-fixed: var(--on-tertiary-fixed);
+  --color-error-surface: var(--error-surface);
+  --color-error-text: var(--error-text);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-text: var(--warning-text);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+
+  /* Legacy aliases kept for existing components. */
+  --color-bg-2: var(--surface-container-low);
+  --color-surface: var(--surface-container-low);
+  --color-text-3: var(--text-muted);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    @apply bg-background text-body text-foreground font-sans antialiased;
+    overflow-x: hidden;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-sans font-semibold text-foreground;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--brand-tint);
+    color: var(--brand);
+  }
+  code {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  /* Section labels like "PIPELINE", "TARGET 01". */
+  .label-caps {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+}
