@@ -28,8 +28,8 @@ providers or load real model weights: use fakes like the ones in `tests/`.
 ## Do not change the text the model sees
 
 Falco's student model is trained on text pairs built by `schema.text_question` and on the
-fixed option lists in `schema.py`. Changing any of these silently breaks every model that
-was already trained:
+fixed option lists in `src/falco/questions/schema.py`. Changing any of these silently
+breaks every model that was already trained:
 
 - the tags in `text_question` (`Afirmation`, `Question`, `Score`, including the spelling)
 - the `noul` options `["sí", "no"]` and the type names `noul`, `choice`, `score`
@@ -37,7 +37,7 @@ was already trained:
 - `normalize_state` (JSON states are serialized with sorted keys)
 - the response keys of `POST /v1/decide`
 
-`tests/test_schema.py` pins this text. If you think one of these should change, open an
+`tests/questions/test_schema.py` pins this text. If you think one of these should change, open an
 issue first: it needs a migration plan and a version bump.
 
 ## Commits

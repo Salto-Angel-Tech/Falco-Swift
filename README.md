@@ -10,7 +10,7 @@ new text in milliseconds, without calling any LLM at inference time.
 
 ```mermaid
 flowchart LR
-    questions["questions.json"] --> tag["tag.py<br/>(teacher LLM)"] --> data["data.jsonl"] --> train["train.py<br/>(student encoder)"] --> model["model_s1/"] --> main["main.py (HTTP)<br/>/v1/decide"]
+    questions["questions.json"] --> tag["falco tag<br/>(teacher LLM)"] --> data["data.jsonl"] --> train["falco train<br/>(student encoder)"] --> model["model_s1/"] --> main["falco serve (HTTP)<br/>/v1/decide"]
 ```
 
 ## Quick path
@@ -20,13 +20,13 @@ uv sync --extra openai                     # dependencies (+ OpenAI/Gemini/OpenR
 # Create .env with GEMINI_API_KEY=...       # or export ANTHROPIC_API_KEY / OPENAI_API_KEY / OPENROUTER_API_KEY
 
 # 1. Label: generate 200 synthetic states and label them with the teacher
-python tag.py --questions questions.json --generate 200 --provider gemini
+uv run falco tag --questions questions.json --generate 200 --provider gemini
 
 # 2. Train and calibrate the student
-python train.py --data data.jsonl --output model_s1
+uv run falco train --data data.jsonl --output model_s1
 
 # 3. Serve it
-uvicorn main:app --port 8000
+uv run falco serve --port 8000
 ```
 
 Then ask it something:
@@ -54,7 +54,7 @@ EOF
 |------|---------|
 | **State** | The input to judge: a string, or any JSON value (serialized with sorted keys). |
 | **Question** | What you want to know about the state. Has a `type` and `instructions`. |
-| **Teacher** | The LLM that labels states with probabilities during `tag.py`. Any provider. |
+| **Teacher** | The LLM that labels states with probabilities during `falco tag`. Any provider. |
 | **Student / System One** | The fine-tuned encoder that answers at inference time. |
 | **Calibration** | A single temperature fitted after training so that "0.9" is right ~90% of the time. |
 
@@ -84,9 +84,9 @@ Questions live in a JSON object keyed by question name (see `questions.json`).
 
 ---
 
-## Step 1 — Label with a teacher (`tag.py`)
+## Step 1 — Label with a teacher (`falco tag`)
 
-`tag.py` builds the training set: one row per `(state, question)` pair with the
+`falco tag` builds the training set: one row per `(state, question)` pair with the
 teacher's probability distribution over the options.
 
 ### Choosing a teacher
@@ -102,7 +102,7 @@ The teacher is provider-agnostic. Four providers cover practically every model:
 
 ```bash
 # OpenRouter (model ids are "<org>/<model>", e.g. anthropic/claude-sonnet-5, openai/gpt-5)
-python tag.py --questions questions.json --generate 200 --provider openrouter \
+uv run falco tag --questions questions.json --generate 200 --provider openrouter \
     --model deepseek/deepseek-chat
 ```
 
@@ -119,7 +119,7 @@ python tag.py --questions questions.json --generate 200 --provider openrouter \
 
 ```bash
 # Local model with Ollama (no key needed)
-python tag.py --questions questions.json --generate 200 --provider openai \
+uv run falco tag --questions questions.json --generate 200 --provider openai \
     --base-url http://localhost:11434/v1 --model llama3.1
 ```
 
@@ -163,15 +163,15 @@ Use only effort values your provider accepts (Gemini: `none`, `low`, `medium`, `
 
 ---
 
-## Step 2 — Train the student (`train.py`)
+## Step 2 — Train the student (`falco train`)
 
 ```bash
-python train.py --data data.jsonl --output model_s1
+uv run falco train --data data.jsonl --output model_s1
 ```
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--data` | `data.jsonl` | Rows produced by `tag.py` |
+| `--data` | `data.jsonl` | Rows produced by `falco tag` |
 | `--base` | `microsoft/mdeberta-v3-base` | Base encoder (lighter: `distilbert-base-multilingual-cased`) |
 | `--output` | `model_s1` | Model folder |
 | `--epochs` | `4` | Training epochs |
@@ -202,14 +202,14 @@ python train.py --data data.jsonl --output model_s1
 
 ---
 
-## Step 3 — Serve (`main.py`)
+## Step 3 — Serve (`falco serve`)
 
 ```bash
-MODEL_S1=model_s1 uvicorn main:app --port 8000
+MODEL_S1=model_s1 uv run falco serve --port 8000
 ```
 
 The model loads once at startup on CUDA, Apple MPS or CPU (in that order). If the folder
-is missing the app refuses to start and tells you to run `train.py`.
+is missing the app refuses to start and tells you to run `falco train`.
 
 ### `GET /health`
 
@@ -267,20 +267,20 @@ Values must be positive integers; the app refuses to start otherwise.
 
 ---
 
-## Step 4 — Inspect predictions (`evaluate.py`)
+## Step 4 — Inspect predictions (`falco evaluate`)
 
 Drop a few hand-written cases into a folder, one JSON file each with a `state` field
 (and an optional `id`), and print what the trained model answers for them:
 
 ```bash
-python evaluate.py --model model_s1 --questions questions.json --cases cases
+uv run falco evaluate --model model_s1 --questions questions.json --cases cases
 ```
 
 ```json
 {"id": "refund-1", "state": "I want my money back, the service never worked"}
 ```
 
-This is a quick eyeball check, not a metric: use the validation numbers from `train.py`
+This is a quick eyeball check, not a metric: use the validation numbers from `falco train`
 to judge quality.
 
 ---
@@ -312,17 +312,31 @@ model_s1/
 
 ## Project layout
 
-| File | Role |
+The code lives in the `falco` package under `src/`, one subpackage per pipeline stage. Data
+files (`questions.json`, `data.jsonl`, `model_s1/`, `cases/`) stay in the directory you run
+`falco` from.
+
+```
+src/falco/
+├── cli.py                 # `falco <tag|train|serve|evaluate|studio>` entry point
+├── questions/schema.py    # question validation, option lists, question-to-text, state normalization
+├── labelling/
+│   ├── teachers.py        # teacher port and adapters (Anthropic, OpenAI-compatible, Gemini, OpenRouter)
+│   └── tag.py             # step 1: synthetic generation and labelling
+├── training/train.py      # step 2: training, metrics and temperature calibration
+├── inference/
+│   ├── model.py           # `SystemOne` network, save/load, `Classifier` for inference
+│   └── api.py             # step 3: FastAPI service
+├── evaluation/evaluate.py # step 4: print the model's answers for hand-written cases
+└── studio/                # Falco Studio backend: app.py (API), jobs.py (tag/train jobs), parse.py
+```
+
+| Path | Role |
 |------|------|
-| `schema.py` | Question validation, option lists, question-to-text, state normalization |
-| `teachers.py` | Teacher port and adapters (Anthropic, OpenAI-compatible, Gemini, OpenRouter) with retries |
-| `tag.py` | Step 1: synthetic generation and labelling |
-| `model.py` | `SystemOne` network, save/load, `Classifier` for inference |
-| `train.py` | Step 2: training, metrics and temperature calibration |
-| `main.py` | Step 3: FastAPI service |
-| `evaluate.py` | Step 4: print the model's answers for hand-written cases |
+| `src/falco/` | The package above |
+| `tests/` | Unit tests mirroring the package layout (no network, no GPU) |
+| `web/` | Falco Studio frontend (Vite + React) |
 | `questions.json` | Example questions (Spanish customer-support domain) |
-| `tests/` | Unit tests for schema, teachers, labelling, training, model math and API (no network) |
 
 ## Limitations
 
@@ -330,7 +344,7 @@ model_s1/
   calibration are only measured for the questions the model was trained on.
 - **The student inherits the teacher.** Labels come from an LLM; its biases and mistakes
   are distilled along with its knowledge. Check the validation metrics and inspect
-  predictions (`evaluate.py`) before relying on the model.
+  predictions (`falco evaluate`) before relying on the model.
 - **No authentication.** The HTTP service is meant for a trusted network or to sit behind
   your own gateway; do not expose it directly to the internet.
 - **Bounded requests.** `/v1/decide` rejects requests over the
@@ -339,7 +353,7 @@ model_s1/
 ## Responsible use
 
 Falco trains a model on answers produced by a third-party LLM. Many providers restrict
-using their outputs to train other models. Before labelling with `tag.py`, review the terms
+using their outputs to train other models. Before labelling with `falco tag`, review the terms
 of service of the provider and model you use as teacher, and make sure you have the right to
 use the states you send to it (personal or confidential data included).
 
@@ -352,6 +366,23 @@ uv run ruff check . && uv run ruff format --check .
 ```
 
 Tests use fake clients and a fake classifier, so they need neither API keys nor a GPU.
+
+## Studio
+
+Falco Studio is a local web UI to edit questions, run labelling and training jobs, follow
+their progress live, and try or evaluate trained models. The frontend is built with React,
+TypeScript, Tailwind CSS and shadcn/ui.
+
+```bash
+task web:install   # once: install the frontend dependencies (Node 22+)
+task dev           # backend on 127.0.0.1:8001 + frontend dev server
+```
+
+Open http://localhost:5173. To skip the dev server, run `task web:build` once, then
+`task studio` and open http://127.0.0.1:8001 (the backend serves `web/dist`).
+
+The studio starts `falco tag`/`falco train` processes and reads and writes files under the
+directory it runs in (or `FALCO_STUDIO_ROOT`), so it binds to localhost only. Do not expose it on a network.
 
 ## Contributing
 

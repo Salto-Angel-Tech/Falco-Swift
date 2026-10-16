@@ -1,0 +1,116 @@
+# https://taskfile.dev
+version: "3"
+
+dotenv: [".env"]
+
+vars:
+  QUESTIONS: questions.json
+  DATA: data.jsonl
+  MODEL: model_s1
+  PROVIDER: anthropic
+  GENERATE: "200"
+  PORT: "8000"
+  CASES: cases
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  install:
+    desc: Install dependencies (with OpenAI/Gemini/OpenRouter support)
+    cmds:
+      - uv sync --extra openai
+
+  tag:
+    desc: "Label states with the teacher LLM (vars: PROVIDER, GENERATE, QUESTIONS, DATA)"
+    cmds:
+      - uv run falco tag --questions {{.QUESTIONS}} --generate {{.GENERATE}} --provider {{.PROVIDER}} --output {{.DATA}} {{.CLI_ARGS}}
+
+  train:
+    desc: "Train and calibrate the student (vars: DATA, MODEL)"
+    cmds:
+      - uv run falco train --data {{.DATA}} --output {{.MODEL}} {{.CLI_ARGS}}
+
+  serve:
+    desc: "Serve the model over HTTP (vars: MODEL, PORT)"
+    env:
+      MODEL_S1: "{{.MODEL}}"
+    cmds:
+      - uv run falco serve --port {{.PORT}} {{.CLI_ARGS}}
+
+  studio:
+    desc: Run the Falco Studio backend on http://127.0.0.1:8001
+    cmds:
+      - uv run falco studio --host 127.0.0.1 --port 8001 {{.CLI_ARGS}}
+
+  web:install:
+    desc: Install the Falco Studio frontend dependencies
+    dir: web
+    cmds:
+      - npm install
+
+  web:dev:
+    desc: Run the Falco Studio frontend dev server on http://localhost:5173
+    dir: web
+    cmds:
+      - npm run dev
+
+  web:build:
+    desc: Build the Falco Studio frontend into web/dist (served by the studio backend)
+    dir: web
+    cmds:
+      - npm run build
+
+  web:test:
+    desc: Run the Falco Studio frontend tests
+    dir: web
+    cmds:
+      - npm test
+
+  web:lint:
+    desc: Lint the Falco Studio frontend
+    dir: web
+    cmds:
+      - npm run lint
+
+  dev:
+    desc: Run the studio backend and the frontend dev server together
+    deps: [studio, web:dev]
+
+  evaluate:
+    desc: "Print the model's answers for hand-written cases (vars: MODEL, QUESTIONS, CASES)"
+    cmds:
+      - uv run falco evaluate --model {{.MODEL}} --questions {{.QUESTIONS}} --cases {{.CASES}} {{.CLI_ARGS}}
+
+  pipeline:
+    desc: Label, train and serve end to end
+    cmds:
+      - task: tag
+      - task: train
+      - task: serve
+
+  test:
+    desc: Run the test suite
+    cmds:
+      - uv run pytest {{.CLI_ARGS}}
+
+  lint:
+    desc: Check lint and formatting
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  format:
+    desc: Auto-fix lint issues and format the code
+    cmds:
+      - uv run ruff check --fix .
+      - uv run ruff format .
+
+  check:
+    desc: Lint and test (what CI runs)
+    cmds:
+      - task: lint
+      - task: test

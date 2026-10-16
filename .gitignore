@@ -28,3 +28,8 @@ model_*/
 # Local evaluation cases and private experiments
 pruebas/
 *_agente.*
+
+# Falco Studio
+.falco_studio/
+node_modules/
+web/dist/
