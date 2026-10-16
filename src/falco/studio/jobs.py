@@ -84,7 +84,8 @@ def resolve_in_root(root: Path, raw: str) -> Path:
     if not isinstance(raw, str) or not raw.strip() or "\x00" in raw:
         raise ValueError(f"invalid path: {raw!r}")
     base = Path(root).resolve()
-    path = (base / raw).resolve()
+    # Treat backslashes as separators on every OS so "..\\x" cannot escape on POSIX.
+    path = (base / raw.replace("\\", "/")).resolve()
     if not path.is_relative_to(base):
         raise ValueError(f"path is outside the studio root: {raw!r}")
     return path
